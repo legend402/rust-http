@@ -66,7 +66,9 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
             match query_str {
                 Some(str) => {
                     let hash_map = query_str_to_map(str);
-                    let num_vec: Vec<i32> = hash_map.values().map(|it| it.parse::<i32>().unwrap()).collect();
+                    let num_vec: Vec<i32> = hash_map.values()
+                    .map(|it| it.parse::<i32>().unwrap())
+                    .collect();
 
                     for num in num_vec {
                         result = result + num;
@@ -76,7 +78,8 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
 
                 }
             }
-            let test = get_file_content("./home.html").replace("home", result.to_string().as_str());
+            let test = get_file_content("./home.html")
+            .replace("home", result.to_string().as_str());
             let response = Response::new(
                 Body::from(test)
             );
