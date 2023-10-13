@@ -35,9 +35,7 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
                     let hash_map = query_str_to_map(str);
                     println!("{:?}", hash_map);
                 }
-                None => {
-
-                }
+                None => {}
             }
             let response = Response::new(
                 Body::from(get_file_content("./test.html"))
@@ -65,14 +63,12 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
             let mut result: i32 = 0;
             match query_str {
                 Some(str) => {
-                    let hash_map = query_str_to_map(str);
+                    let hash_map: HashMap<&str, &str> = query_str_to_map(str);
                     let num_vec: Vec<i32> = hash_map.values()
                     .map(|it| it.parse::<i32>().unwrap())
                     .collect();
 
-                    for num in num_vec {
-                        result = result + num;
-                    }
+                    result = reduce(num_vec.clone().into_iter(), |cur, item| cur + item, 0);
                 }
                 None => {
 
@@ -114,4 +110,15 @@ fn query_str_to_map(query_str: &str) -> HashMap<&str, &str>  {
         hash_map.insert(key_value[0], key_value[1]);
     }
     hash_map
+}
+
+fn reduce<F, T, D>(iter: impl Iterator<Item = T>, accumulator: F, default_value: D) -> D
+where
+   F: Fn(D, T) -> D,
+{
+   let mut accumulator_value: D = default_value;
+   for item in iter {
+       accumulator_value = accumulator(accumulator_value, item);
+   }
+   accumulator_value
 }
