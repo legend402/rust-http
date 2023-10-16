@@ -1,9 +1,14 @@
 use std::collections::HashMap;
-use std::fs;
+use std::fs::{self};
+use std::path::PathBuf;
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
+use reqwest::Client;
 use serde_json::Value;
+use urlencoding::decode;
+use encoding_rs::GBK;
+
 
 #[tokio::main]
 async fn main() -> Result<(), hyper::Error> {
@@ -81,9 +86,91 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
             );
             Ok(response)
         }
+        "/getjuejindata" => {
+            let client = Client::new();
+            let url = "https://api.juejin.cn/recommend_api/v1/article/recommend_cate_feed";
+            let value = serde_json::json!({
+                "cate_id": "6809637767543259144",
+                "cursor": "0",
+                "id_type": 2,
+                "limit": 20,
+                "sort_type": 300,
+            }).to_string();
+            
+            let response = client.post(url)
+                .header("Content-Type", "application/json; charset=utf-8")
+                .body(value)
+                .send()
+                .await.expect("请求失败");
+            let str_content = response.text().await.unwrap();
+            let response: Response<Body> = Response::builder()
+                .header("Content-Type", "application/json; charset=utf-8")
+                .body(Body::from(str_content))
+                .expect("Fail to create response");
+            Ok(response)
+        }
+        "/filelist" => {
+            let query_str = _req.uri().query();
+            let mut dir_path = String::new();
+            match query_str {
+                Some(str) => {
+                    let hash_map: HashMap<&str, &str> = query_str_to_map(str);
+                    dir_path = hash_map.get("path").unwrap().to_string();
+                    // 转译一些特殊字符
+                    dir_path = decode(&dir_path).unwrap().to_string();
+                }
+                None => {}
+            }
+
+            if PathBuf::from(&dir_path).is_dir() {
+                let dirs = fs::read_dir(&dir_path);
+                match dirs {
+                    Ok(dir) => {
+                        let entries: Vec<String> = dir.map(|it| it.unwrap().path().to_string_lossy().to_string()).collect();
+    
+                        let vec_str = serde_json::json!(entries).to_string();
+            
+                        let response: Response<Body> = Response::builder()
+                            .header("Content-Type", "application/json; charset=utf-8")
+                            .body(Body::from(vec_str))
+                            .expect("Fail to create response");
+                        Ok(response)
+                    },
+                    Err(err) => {
+                        let response: Response<Body> = Response::builder()
+                            .header("Content-Type", "application/json; charset=utf-8")
+                            .body(Body::from(err.to_string()))
+                            .expect("Fail to create response");
+                        Ok(response)
+                    }
+                }
+            } else {
+                let file = fs::read(&dir_path);
+                match file {
+                    Ok(content) => {
+                        let (decoded, _, _) = GBK.decode(&content);
+                        let content_str = decoded.to_string();
+
+                        let response: Response<Body> = Response::builder()
+                            .header("Content-Type", "application/json; charset=utf-8")
+                            .body(Body::from(content_str))
+                            .expect("Fail to create response");
+                        Ok(response)
+                    },
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        let response: Response<Body> = Response::builder()
+                            .header("Content-Type", "application/json; charset=utf-8")
+                            .body(Body::from(err.to_string()))
+                            .expect("Fail to create response");
+                        Ok(response) 
+                    }
+                }
+            }
+        }
         _ => {
-            if path.ends_with(".js") {
-                let file_path = ".".to_owned() + path.as_str();
+            if path.ends_with(".js") || path.ends_with(".html") {
+                let file_path = String::from(".") + &String::from(path);
                 let response = Response::new(
                     Body::from(get_file_content(&file_path))
                 );

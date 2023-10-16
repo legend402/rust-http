@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <input type="text" id="input" /><button>get file or dir</button>
+  <textarea name="" id="" cols="100" rows="10"></textarea>
+  <ul class="file-list"></ul>
+  <script>
+    const input = document.querySelector('input');
+    const button = document.querySelector('button');
+    const ul = document.querySelector('.file-list');
+    const textarea = document.querySelector('textarea');
+
+    ul.addEventListener('dblclick', e => {
+      getFileList(e.target.textContent)
+    })
+
+    button.addEventListener('click', () => {
+      getFileList(input.value)
+    })
+
+    function getFileList(path) {
+      fetch(`http://127.0.0.1:8888/filelist?path=${path}`)
+      .then(res => {
+        try {
+          return res.json()
+        } catch (error) {
+          return res.blob()
+        }
+      })
+      .then(res => {
+        ul.innerHTML = '';
+        textarea.value = '';
+        if (Array.isArray(res)) {
+          ul.innerHTML = res.map(item => `<li>${item}</li>`).join('')
+        } else {
+          textarea.value = res
+        }
+      })
+    }
+  </script>
+</body>
+</html>
