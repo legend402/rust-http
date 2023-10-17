@@ -42,15 +42,11 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
                 }
                 None => {}
             }
-            let response = Response::new(
-                Body::from(get_file_content("./test.html"))
-            );
+            let response = get_response_file(get_file_content("./test.html"));
             Ok(response)
         }
         "/home" => {
-            let response = Response::new(
-                Body::from(get_file_content("./home.html"))
-            );
+            let response = get_response_file(get_file_content("./home.html"));
             Ok(response)
         }
         "/post" => {
@@ -58,9 +54,7 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
             let body = String::from_utf8(bytes.to_vec()).unwrap();
             let body_map: Value = serde_json::from_str(body.as_str()).unwrap();
             println!("{:?}", body_map);
-            let response = Response::new(
-                Body::from(body)
-            );
+            let response = get_response_content(body);
             Ok(response)
         }
         "/sum" => {
@@ -81,9 +75,7 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
             }
             let test = get_file_content("./home.html")
             .replace("home", result.to_string().as_str());
-            let response = Response::new(
-                Body::from(test)
-            );
+            let response = get_response_file(test);
             Ok(response)
         }
         "/getjuejindata" => {
@@ -103,10 +95,7 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
                 .send()
                 .await.expect("请求失败");
             let str_content = response.text().await.unwrap();
-            let response: Response<Body> = Response::builder()
-                .header("Content-Type", "application/json; charset=utf-8")
-                .body(Body::from(str_content))
-                .expect("Fail to create response");
+            let response: Response<Body> = get_response_content(str_content);
             Ok(response)
         }
         "/filelist" => {
@@ -130,17 +119,14 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
     
                         let vec_str = serde_json::json!(entries).to_string();
             
-                        let response: Response<Body> = Response::builder()
-                            .header("Content-Type", "application/json; charset=utf-8")
-                            .body(Body::from(vec_str))
-                            .expect("Fail to create response");
+                        let response: Response<Body> = get_response_content(vec_str);
                         Ok(response)
                     },
                     Err(err) => {
-                        let response: Response<Body> = Response::builder()
-                            .header("Content-Type", "application/json; charset=utf-8")
-                            .body(Body::from(err.to_string()))
-                            .expect("Fail to create response");
+                        let value = serde_json::json!({
+                            "message": err.to_string(),
+                        }).to_string();
+                        let response = get_response_content(value);
                         Ok(response)
                     }
                 }
@@ -150,19 +136,17 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
                     Ok(content) => {
                         let (decoded, _, _) = GBK.decode(&content);
                         let content_str = decoded.to_string();
-
-                        let response: Response<Body> = Response::builder()
-                            .header("Content-Type", "application/json; charset=utf-8")
-                            .body(Body::from(content_str))
-                            .expect("Fail to create response");
+                        let value = serde_json::json!({
+                            "message": content_str,
+                        }).to_string();
+                        let response: Response<Body> = get_response_content(value);
                         Ok(response)
                     },
                     Err(err) => {
-                        eprintln!("{}", err);
-                        let response: Response<Body> = Response::builder()
-                            .header("Content-Type", "application/json; charset=utf-8")
-                            .body(Body::from(err.to_string()))
-                            .expect("Fail to create response");
+                        let value = serde_json::json!({
+                            "message": err.to_string(),
+                        }).to_string();
+                        let response = get_response_content(value);
                         Ok(response) 
                     }
                 }
@@ -171,14 +155,10 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
         _ => {
             if path.ends_with(".js") || path.ends_with(".html") {
                 let file_path = String::from(".") + &String::from(path);
-                let response = Response::new(
-                    Body::from(get_file_content(&file_path))
-                );
+                let response = get_response_file(get_file_content(&file_path));
                 return Ok(response);
             }
-            let response = Response::new(
-                Body::from(get_file_content("./404.html"))
-            );
+            let response = get_response_file(get_file_content("./404.html"));
             Ok(response)
         }
     }
@@ -208,4 +188,21 @@ where
        accumulator_value = accumulator(accumulator_value, item);
    }
    accumulator_value
+}
+
+fn get_response_content<T>(content: T) -> Response<Body>
+where 
+    T: ToString, hyper::Body: From<T>
+{
+    Response::builder()
+        .header("Content-Type", "application/json; charset=utf-8")
+        .body(Body::from(content))
+        .expect("Fail to create response")
+}
+
+fn get_response_file<T>(content: T) -> Response<Body>
+where 
+    T: ToString, hyper::Body: From<T>
+{
+    Response::new(Body::from(content))
 }

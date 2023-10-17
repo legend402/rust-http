@@ -6,40 +6,92 @@
   <title>Document</title>
 </head>
 <body>
-  <input type="text" id="input" /><button>get file or dir</button>
+  <input type="text" id="input" />
+  <button class="submit">get file or dir</button>
+  <button class="back">back</button>
+  <button class="forward">forward</button>
+  <button class="reset">resetDir</button>
   <textarea name="" id="" cols="100" rows="10"></textarea>
   <ul class="file-list"></ul>
   <script>
+    class DirectoryHistory {
+      constructor(execute, { defaultPath = "C:\\", immediate = false } = {}) {
+        this.history = [defaultPath];
+        this.index = 1;
+        this.defaultPath = defaultPath
+        this.execute = execute || (() => {})
+        if (immediate) this.execute(defaultPath)
+      }
+      push(path) {
+        if (this.history.includes(path)) return
+        this.history = this.history.slice(0, this.index);
+        this.index = this.history.push(path)
+      }
+      back() {
+        if (this.index <= 1) return;
+        this.index--;
+        const path = this.history[this.index - 1];
+        this.execute(path)
+      }
+      forward() {
+        if (this.index === this.history.length) return;
+        this.index++;
+        const path = this.history[this.index - 1];
+        this.execute(path)
+      }
+      resetDir() {
+        this.history = [this.defaultPath];
+        this.index = 1;
+        this.execute(this.defaultPath)
+      }
+      get path() {
+        return this.history[this.index] || this.defaultPath
+      }
+    }
+    
     const input = document.querySelector('input');
-    const button = document.querySelector('button');
+    const submit = document.querySelector('.submit');
+    const forward = document.querySelector('.forward');
+    const back = document.querySelector('.back');
+    const reset = document.querySelector('.reset');
     const ul = document.querySelector('.file-list');
     const textarea = document.querySelector('textarea');
+    const dirHandler = new DirectoryHistory(getFileList, { immediate: true });
+    input.value = dirHandler.path;
+
+    forward.addEventListener('click', e => {
+      dirHandler.forward()
+    })
+
+    back.addEventListener('click', e => {
+      dirHandler.back()
+    })
+    
+    reset.addEventListener('click', e => {
+      dirHandler.resetDir()
+    })
 
     ul.addEventListener('dblclick', e => {
       getFileList(e.target.textContent)
     })
 
-    button.addEventListener('click', () => {
+    submit.addEventListener('click', () => {
       getFileList(input.value)
     })
-
     function getFileList(path) {
       fetch(`http://127.0.0.1:8888/filelist?path=${path}`)
+      .then(res => res.json())
       .then(res => {
-        try {
-          return res.json()
-        } catch (error) {
-          return res.blob()
-        }
-      })
-      .then(res => {
-        ul.innerHTML = '';
-        textarea.value = '';
         if (Array.isArray(res)) {
+          dirHandler.push(path)
+          input.value = path;
           ul.innerHTML = res.map(item => `<li>${item}</li>`).join('')
         } else {
-          textarea.value = res
+          textarea.value = res.message
         }
+      })
+      .catch((err) => {
+        console.err(err);
       })
     }
   </script>
