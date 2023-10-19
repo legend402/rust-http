@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fs::{self};
+use std::fs::{self, OpenOptions, File};
 use std::path::PathBuf;
 
 use hyper::service::{make_service_fn, service_fn};
@@ -31,7 +31,7 @@ async fn main() -> Result<(), hyper::Error> {
 
 async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     let path = _req.uri().path().to_lowercase();
-
+    
     match path.as_str() {
         "/test" => {
             let query_str = _req.uri().query();
@@ -69,9 +69,7 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
 
                     result = reduce(num_vec.clone().into_iter(), |cur, item| cur + item, 0);
                 }
-                None => {
-
-                }
+                None => {}
             }
             let test = get_file_content("./home.html")
             .replace("home", result.to_string().as_str());
@@ -152,6 +150,32 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
                 }
             }
         }
+        "/add_file" => {
+            let query_str = _req.uri().query();
+            let mut file_path: String = String::new();
+            let mut file_name: String = String::new();
+            match query_str {
+                Some(str) => {
+                    let hash_map = query_str_to_map(str);
+                    file_path = hash_map.get("file_path").unwrap().to_string();
+                    file_name = hash_map.get("file_name").unwrap().to_string();
+                }
+                None => {}
+            }
+            if file_path.len() > 0 && file_name.len() > 0 {
+                file_path = format!("{}/{}", file_path, file_name);
+                File::create(file_path).unwrap();
+                Ok(Response::new(Body::from(serde_json::json!({
+                    "message": "添加成功！",
+                    "success": true,
+                }).to_string())))
+            } else {
+                Ok(Response::new(Body::from(serde_json::json!({
+                    "message": "添加失败！",
+                    "success": false,
+                }).to_string())))
+            }
+            }
         _ => {
             if path.ends_with(".js") || path.ends_with(".html") {
                 let file_path = String::from(".") + &String::from(path);

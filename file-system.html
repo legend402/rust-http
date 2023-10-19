@@ -1,25 +1,68 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet" />
+  <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
   <title>Document</title>
+  <style>
+    body {
+      padding: 20px;
+    }
+    ul {
+      max-height: 760px;
+      padding-left: 0;
+      list-style: none;
+      overflow: auto;
+    }
+
+    ul li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 5px 0;
+      padding: 0 10px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all .3s;
+      background-color: rgba(0, 255, 255, 0);
+    }
+
+    ul li:hover {
+      background-color: rgba(0, 255, 255, .1);
+    }
+  </style>
 </head>
+
 <body>
-  <input type="text" id="input" />
-  <button class="submit">get file or dir</button>
-  <button class="back">back</button>
-  <button class="forward">forward</button>
-  <button class="reset">resetDir</button>
-  <textarea name="" id="" cols="100" rows="10"></textarea>
-  <ul class="file-list"></ul>
+  <div style="display: flex; gap: 20px;">
+    <div style="display: flex; gap: 10px;">
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div>
+          <input type="text" id="input" class="form-control mb-2" />
+          <button type="button" class="btn btn-primary submit">get file or dir</button>
+          <button type="button" class="btn btn-primary back">back</button>
+          <button type="button" class="btn btn-primary forward">forward</button>
+          <button type="button" class="btn btn-primary reset">resetDir</button>
+          <button type="folder" class="btn btn-primary add-folder">new folder</button>
+          <button type="file" class="btn btn-primary add-file">new file</button>
+        </div>
+        <ul class="file-list"></ul>
+      </div>
+    </div>
+    <div>
+      <textarea name="" id="" cols="150" rows="35" class="form-control"></textarea>
+    </div>
+  </div>
   <script>
     class DirectoryHistory {
-      constructor(execute, { defaultPath = "C:\\", immediate = false } = {}) {
+      constructor(execute, { defaultPath = "D:\\", immediate = false } = {}) {
         this.history = [defaultPath];
         this.index = 1;
         this.defaultPath = defaultPath
-        this.execute = execute || (() => {})
+        this.execute = execute || (() => { })
         if (immediate) this.execute(defaultPath)
       }
       push(path) {
@@ -45,15 +88,19 @@
         this.execute(this.defaultPath)
       }
       get path() {
-        return this.history[this.index] || this.defaultPath
+        return this.history[this.index - 1] || this.defaultPath
       }
     }
-    
+
     const input = document.querySelector('input');
+
     const submit = document.querySelector('.submit');
     const forward = document.querySelector('.forward');
     const back = document.querySelector('.back');
     const reset = document.querySelector('.reset');
+    const addFolder = document.querySelector('.add-folder');
+    const addFile = document.querySelector('.add-file');
+
     const ul = document.querySelector('.file-list');
     const textarea = document.querySelector('textarea');
     const dirHandler = new DirectoryHistory(getFileList, { immediate: true });
@@ -66,13 +113,34 @@
     back.addEventListener('click', e => {
       dirHandler.back()
     })
-    
+
     reset.addEventListener('click', e => {
       dirHandler.resetDir()
     })
 
+    addFolder.addEventListener('click', e => {
+      const value = prompt("请输入新增文件夹名称！")
+      if (!value) return;
+      console.log(value);
+    })
+
+    addFile.addEventListener('click', e => {
+      const value = prompt("请输入新增文件名称！")
+      if (!value) return;
+      fetch(`http://127.0.0.1:8888/add_file?file_path=${dirHandler.path}&file_name=${value}`)
+        .then(res => res.json())
+        .then(res => {
+          if (res.success) {
+            dirHandler.execute(dirHandler.path)
+          }
+        })
+        .catch((err) => {
+          console.err(err);
+        })
+    })
+
     ul.addEventListener('dblclick', e => {
-      getFileList(e.target.textContent)
+      getFileList(e.target.dataset.path)
     })
 
     submit.addEventListener('click', () => {
@@ -80,20 +148,24 @@
     })
     function getFileList(path) {
       fetch(`http://127.0.0.1:8888/filelist?path=${path}`)
-      .then(res => res.json())
-      .then(res => {
-        if (Array.isArray(res)) {
-          dirHandler.push(path)
-          input.value = path;
-          ul.innerHTML = res.map(item => `<li>${item}</li>`).join('')
-        } else {
-          textarea.value = res.message
-        }
-      })
-      .catch((err) => {
-        console.err(err);
-      })
+        .then(res => res.json())
+        .then(res => {
+          if (Array.isArray(res)) {
+            dirHandler.push(path)
+            input.value = path;
+            ul.innerHTML = res.map(item => `<li data-path="${item}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path fill="currentColor" d="m11.17 6l3.42 3.41l.58.59H28v16H4V6h7.17m0-2H4a2 2 0 0 0-2 2v20a2 2 0 0 0 2 2h24a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2H16l-3.41-3.41A2 2 0 0 0 11.17 4Z"/></svg>
+            ${item}
+          </li>`).join('')
+          } else {
+            textarea.value = res.message
+          }
+        })
+        .catch((err) => {
+          console.err(err);
+        })
     }
   </script>
 </body>
+
 </html>
