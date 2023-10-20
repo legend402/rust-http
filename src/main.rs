@@ -1,6 +1,10 @@
+mod interface;
+
 use std::collections::HashMap;
-use std::fs::{self, OpenOptions, File};
+use std::fs::{self, File};
+use std::io::Write;
 use std::path::PathBuf;
+use std::io::prelude::*;
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
@@ -8,7 +12,6 @@ use reqwest::Client;
 use serde_json::Value;
 use urlencoding::decode;
 use encoding_rs::GBK;
-
 
 #[tokio::main]
 async fn main() -> Result<(), hyper::Error> {
@@ -113,7 +116,15 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
                 let dirs = fs::read_dir(&dir_path);
                 match dirs {
                     Ok(dir) => {
-                        let entries: Vec<String> = dir.map(|it| it.unwrap().path().to_string_lossy().to_string()).collect();
+                        let entries: Vec<interface::FileList> = dir.map(
+                            |it| {
+                                let file_path = it.unwrap().path().to_string_lossy().to_string();
+                                interface::FileList {
+                                    file_path: file_path.clone(),
+                                    file_type: String::from(if PathBuf::from(&file_path).is_dir() { "folder" } else { "file" })
+                                }
+                            }
+                        ).collect();
     
                         let vec_str = serde_json::json!(entries).to_string();
             
@@ -150,6 +161,35 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
                 }
             }
         }
+        "/add_folder" => {
+            let query_str = _req.uri().query();
+            let mut file_path: String = String::new();
+            let mut file_name: String = String::new();
+            match query_str {
+                Some(str) => {
+                    let hash_map = query_str_to_map(str);
+                    file_path = hash_map.get("file_path").unwrap().to_string();
+                    file_name = hash_map.get("file_name").unwrap().to_string();
+                }
+                None => {}
+            }
+            if file_path.len() > 0 && file_name.len() > 0 {
+                file_path = format!("{}/{}", file_path, file_name);
+                let folder_exist = PathBuf::from(&file_path).exists();
+                if !folder_exist {
+                    fs::create_dir_all(file_path).unwrap();
+                }
+                Ok(Response::new(Body::from(serde_json::json!({
+                    "message": if folder_exist {"文件夹已存在！"} else {"添加成功！"},
+                    "success": true,
+                }).to_string())))
+            } else {
+                Ok(Response::new(Body::from(serde_json::json!({
+                    "message": "添加失败！",
+                    "success": false,
+                }).to_string())))
+            }
+        }
         "/add_file" => {
             let query_str = _req.uri().query();
             let mut file_path: String = String::new();
@@ -164,9 +204,12 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
             }
             if file_path.len() > 0 && file_name.len() > 0 {
                 file_path = format!("{}/{}", file_path, file_name);
-                File::create(file_path).unwrap();
+                let file_exist = PathBuf::from(&file_path).exists();
+                if !file_exist {
+                    File::create(file_path).unwrap();
+                }
                 Ok(Response::new(Body::from(serde_json::json!({
-                    "message": "添加成功！",
+                    "message": if file_exist {"文件已存在！"} else {"添加成功！"},
                     "success": true,
                 }).to_string())))
             } else {
@@ -175,7 +218,21 @@ async fn handle_request(_req: Request<Body>) -> Result<Response<Body>, hyper::Er
                     "success": false,
                 }).to_string())))
             }
+        }
+        "/save_file" => {
+            let bytes = hyper::body::to_bytes(_req.into_body()).await?;
+            let body = String::from_utf8(bytes.to_vec()).unwrap();
+            let body_map: Value = serde_json::from_str(body.as_str()).unwrap();
+            let file_path: String = body_map.get("file_path").unwrap().to_string();
+            if !file_path.is_empty() {
+               let mut file = File::create(path).unwrap();
+               file.write_all(body_map.get("file_content").unwrap().to_string().as_bytes()).unwrap();
             }
+            Ok(Response::new(Body::from(serde_json::json!({
+                "message": "修改成功！",
+                "success": true,
+            }).to_string())))
+        }
         _ => {
             if path.ends_with(".js") || path.ends_with(".html") {
                 let file_path = String::from(".") + &String::from(path);

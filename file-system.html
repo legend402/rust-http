@@ -28,10 +28,23 @@
       cursor: pointer;
       transition: all .3s;
       background-color: rgba(0, 255, 255, 0);
+      border: 1px solid rgba(0, 255, 255, 0);
+    }
+    ul li.active {
+      background-color: rgba(0, 255, 255, .1);
+      border: 1px solid rgba(0, 255, 255, .6);
     }
 
     ul li:hover {
       background-color: rgba(0, 255, 255, .1);
+    }
+    .textarea {
+      position: relative;
+    }
+    .textarea .save-file {
+      position: absolute;
+      right: 10px;
+      bottom: 30px;
     }
   </style>
 </head>
@@ -46,14 +59,16 @@
           <button type="button" class="btn btn-primary back">back</button>
           <button type="button" class="btn btn-primary forward">forward</button>
           <button type="button" class="btn btn-primary reset">resetDir</button>
-          <button type="folder" class="btn btn-primary add-folder">new folder</button>
-          <button type="file" class="btn btn-primary add-file">new file</button>
+          <button type="button" class="btn btn-primary add-folder">new folder</button>
+          <button type="button" class="btn btn-primary add-file">new file</button>
         </div>
         <ul class="file-list"></ul>
       </div>
     </div>
-    <div>
+    <div class="textarea">
       <textarea name="" id="" cols="150" rows="35" class="form-control"></textarea>
+      
+      <button type="button" class="btn btn-primary save-file">save</button>
     </div>
   </div>
   <script>
@@ -100,6 +115,7 @@
     const reset = document.querySelector('.reset');
     const addFolder = document.querySelector('.add-folder');
     const addFile = document.querySelector('.add-file');
+    const saveFile = document.querySelector('.save-file');
 
     const ul = document.querySelector('.file-list');
     const textarea = document.querySelector('textarea');
@@ -118,10 +134,39 @@
       dirHandler.resetDir()
     })
 
+    saveFile.addEventListener('click', e => {
+      const { path } = textarea.dataset
+      if (!path) return
+      fetch(`http://127.0.0.1:8888/save_file`, {
+        method: 'POST',
+        body: JSON.stringify({
+          file_path: dirHandler.path,
+          file_content: textarea.value
+        })
+      })
+        .then(res => res.json())
+        .then(res => {
+          alert(res)
+        })
+        .catch((err) => {
+          console.err(err); 
+        })
+    })
+
     addFolder.addEventListener('click', e => {
       const value = prompt("请输入新增文件夹名称！")
       if (!value) return;
-      console.log(value);
+      fetch(`http://127.0.0.1:8888/add_folder?file_path=${dirHandler.path}&file_name=${value}`)
+        .then(res => res.json())
+        .then(res => {
+          if (res.success) {
+            dirHandler.execute(dirHandler.path)
+          }
+          alert(res.message)
+        })
+        .catch((err) => {
+          console.err(err); 
+        })
     })
 
     addFile.addEventListener('click', e => {
@@ -133,6 +178,7 @@
           if (res.success) {
             dirHandler.execute(dirHandler.path)
           }
+          alert(res.message)
         })
         .catch((err) => {
           console.err(err);
@@ -140,7 +186,14 @@
     })
 
     ul.addEventListener('dblclick', e => {
-      getFileList(e.target.dataset.path)
+      if (e.target.tagName !== "LI") return
+      const { path, type } = e.target.dataset
+      getFileList(path)
+    })
+    ul.addEventListener('click', e => {
+      if (e.target.tagName !== "LI") return
+      ul.querySelectorAll('li').forEach(el => el.classList.remove('active'))
+      e.target.classList.add('active')
     })
 
     submit.addEventListener('click', () => {
@@ -150,15 +203,23 @@
       fetch(`http://127.0.0.1:8888/filelist?path=${path}`)
         .then(res => res.json())
         .then(res => {
+          textarea.value = ''
+          textarea.dataset.path = ''
           if (Array.isArray(res)) {
             dirHandler.push(path)
             input.value = path;
-            ul.innerHTML = res.map(item => `<li data-path="${item}">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path fill="currentColor" d="m11.17 6l3.42 3.41l.58.59H28v16H4V6h7.17m0-2H4a2 2 0 0 0-2 2v20a2 2 0 0 0 2 2h24a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2H16l-3.41-3.41A2 2 0 0 0 11.17 4Z"/></svg>
-            ${item}
+            ul.innerHTML = res.sort((prev, next) => prev.file_type.length < next.file_type.length ? 1 : -1)
+            .map(({ file_path, file_type }) => `<li data-path="${file_path}" data-type="${file_type}">
+            ${
+              file_type === 'folder' ?
+                `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path fill="currentColor" d="m11.17 6l3.42 3.41l.58.59H28v16H4V6h7.17m0-2H4a2 2 0 0 0-2 2v20a2 2 0 0 0 2 2h24a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2H16l-3.41-3.41A2 2 0 0 0 11.17 4Z"/></svg>` :
+                `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path fill="currentColor" d="m25.7 9.3l-7-7c-.2-.2-.4-.3-.7-.3H8c-1.1 0-2 .9-2 2v24c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V10c0-.3-.1-.5-.3-.7zM18 4.4l5.6 5.6H18V4.4zM24 28H8V4h8v6c0 1.1.9 2 2 2h6v16z"/><path fill="currentColor" d="M10 22h12v2H10zm0-6h12v2H10z"/></svg>`
+            }
+            ${file_path}
           </li>`).join('')
           } else {
             textarea.value = res.message
+            textarea.dataset.path = path
           }
         })
         .catch((err) => {
