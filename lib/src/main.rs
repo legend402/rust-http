@@ -23,8 +23,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(Authentication)
             .app_data(web::Data::new(db.clone()))
             .service(router::user::create_user_service())
-
-            .route("/*", web::route().to(async || Response::<()>::not_found("not found".to_string())))
+            .default_service(web::route().to(async || Response::<()>::not_found("no route found".to_string())))
     })
     .bind(format!("{}:{}", ip, port))?
     .run()

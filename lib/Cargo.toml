@@ -13,4 +13,3 @@ serde.workspace = true
 log.workspace = true
 env_logger.workspace = true
 chrono.workspace = true
-derive_more = "2.0.1"
