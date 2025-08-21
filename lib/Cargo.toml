@@ -1,0 +1,16 @@
+[package]
+name = "lib"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+entity = { path = "../entity" }
+actix-web.workspace = true
+dotenvy.workspace = true
+sea-orm.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+log.workspace = true
+env_logger.workspace = true
+chrono.workspace = true
+derive_more = "2.0.1"

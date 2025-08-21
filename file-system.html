@@ -140,13 +140,14 @@
       fetch(`http://127.0.0.1:8888/save_file`, {
         method: 'POST',
         body: JSON.stringify({
-          file_path: dirHandler.path,
-          file_content: textarea.value
+          file_path: path,
+          file_content: textarea.value,
+          file_count: 1,
         })
       })
         .then(res => res.json())
         .then(res => {
-          alert(res)
+          alert(res.message)
         })
         .catch((err) => {
           console.err(err); 
